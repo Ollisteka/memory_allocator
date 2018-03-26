@@ -27,11 +27,11 @@ void *alloc(int num_bytes){
 struct MapItem{
 	int number;
 	int count;
-}
+};
 
 int main(){
 //подменить системный аллокатор
-	void * array = new int[10000;]
+	void *array = new int[10000];
 	for (int i = 0; i<10000; i++){
 		array[i] = alloc(sizeof(MapItem));
 	}
