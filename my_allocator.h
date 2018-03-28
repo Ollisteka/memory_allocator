@@ -9,26 +9,35 @@
 
 using namespace std;
 
-struct MemoryControlBlock {
-    MemoryControlBlock(int size, void *ptr, MemoryControlBlock *prev, MemoryControlBlock *next) {
-        this->size = size;
-        this->memoryPointer = ptr;
-        this->prev = prev;
-        this->next = next;
-        this->isFree = true;
+class MemoryControlBlock {
+
+
+public:
+    MemoryControlBlock() {
+
     }
 
+    MemoryControlBlock(int size, void *ptr, MemoryControlBlock *prev, MemoryControlBlock *nextBlock) {
+        this->size = size;
+        this->memoryPointer = ptr;
+        this->previous = prev;
+        this->next = nextBlock;
+        this->isFree = false;
+    }
     bool isFree;
     int size;
     void *memoryPointer;
     MemoryControlBlock *next;
-    MemoryControlBlock *prev;
+    MemoryControlBlock *previous;
 
     string ToString() {
         // print something from v to str, e.g: Str << v.getX();
-        string freedom = "Is free: " + isFree;
-        string size = "\nTotal size: " + size + "\n";
-        return freedom + size;
+        string freedom = "Is free: ";
+        if (isFree) {
+            freedom += "True";
+        } else { freedom += "False"; }
+        string size_taken = "\nTotal size: " + to_string(size) + "\n";
+        return freedom + size_taken;
     }
 
     void *GetPointer() {
@@ -42,13 +51,13 @@ struct MemoryControlBlock {
 
 class my_allocator {
 private:
-    int chunkSize = 2048;
+    int chunkSize = 16;
     int chunksCount = 10;
     int maxSize = chunkSize * chunksCount;
-    int totalSize = chunkSize * chunksCount;
+    int sizeTaken = 0;
     void *firstAddr;
     void *currentAddr;
-    vector<MemoryControlBlock *> memoryBlocks;
+    vector<MemoryControlBlock> memoryBlocks;
 public:
     my_allocator() {
         firstAddr = malloc(static_cast<size_t>(maxSize));
@@ -56,26 +65,30 @@ public:
     }
 
     void *alloc(int num_bytes) {
-        if (totalSize + num_bytes > maxSize) {
+        if (sizeTaken + num_bytes > maxSize) {
+            cout << "Out of memory!" << endl;
             throw bad_alloc();
         }
-        MemoryControlBlock *block = NULL;
+        MemoryControlBlock block;
         auto result = currentAddr;
         if (memoryBlocks.empty()) {
-            block = new MemoryControlBlock(num_bytes, result, nullptr, nullptr);
+            block = MemoryControlBlock(num_bytes, result, nullptr, nullptr);
         } else {
-            block = new MemoryControlBlock(num_bytes, result, &memoryBlocks[memoryBlocks.size() - 1], nullptr);
+            ulong last = memoryBlocks.size() - 1;
+            MemoryControlBlock lastBlock = memoryBlocks[last];
+            block = MemoryControlBlock(num_bytes, result, &lastBlock, nullptr);
+            lastBlock.next = &block;
         }
 
         currentAddr += num_bytes;
-        totalSize -= num_bytes;
+        sizeTaken += num_bytes;
         memoryBlocks.push_back(block);
         return result;
     }
 
     void free(void *ptr) {
         int idx = -1;
-        MemoryControlBlock *blockToFree = NULL;
+        MemoryControlBlock blockToFree;
         for (int i = 0; i < memoryBlocks.size(); ++i) {
             auto block = memoryBlocks[i];
             if (block.GetPointer() == ptr) {
@@ -87,17 +100,27 @@ public:
         if (idx == -1)
             throw exception();
         memoryBlocks.erase(memoryBlocks.begin() + idx);
-        totalSize -= blockToFree.GetSize();
-        auto nextBlock = blockToFree.next;
-        auto prevBlock = blockToFree.prev;
-        prevBlock->next = nextBlock;
-        nextBlock->prev = prevBlock;
+        sizeTaken -= blockToFree.GetSize();
+        blockToFree.isFree = true;
+
+        MemoryControlBlock *nextBlock = blockToFree.next;
+        MemoryControlBlock *prevBlock = blockToFree.previous;
+        if (prevBlock != NULL) {
+            prevBlock->next = nextBlock;
+        }
+        if (nextBlock != NULL) {
+            nextBlock->previous = prevBlock;
+        }
     }
 
     void Dump() {
-        for (int i = 0; i < memoryBlocks.capacity(); ++i) {
-            cout << memoryBlocks[i].ToString() << endl;
-        }
+        cout << "NEW DUMP:" << endl;
+        cout << "Capacity: " + to_string(maxSize) << endl;
+        cout << "Size taken: " + to_string(sizeTaken) << endl;
+        cout << "Blocks in use: " + to_string(memoryBlocks.size()) << endl;
+//        for (int i = 0; i < memoryBlocks.size(); ++i) {
+//            cout << "BLOCK" + to_string(i) + ":\n" + memoryBlocks[i].ToString() << endl;
+//        }
     }
 };
 
