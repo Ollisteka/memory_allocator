@@ -10,7 +10,7 @@ struct test {
 int main() {
     my_allocator alloc = my_allocator();
     vector<void *> pointers;
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < 9; ++i) {
         pointers.push_back(alloc.alloc(sizeof(test)));
         alloc.Dump();
     }
