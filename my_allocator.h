@@ -17,18 +17,14 @@ public:
 
     }
 
-    MemoryControlBlock(int size, void *ptr, MemoryControlBlock *prev, MemoryControlBlock *nextBlock) {
+    MemoryControlBlock(int size, void *ptr) {
         this->size = size;
         this->memoryPointer = ptr;
-        this->previous = prev;
-        this->next = nextBlock;
         this->isFree = false;
     }
     bool isFree;
     int size;
     void *memoryPointer;
-    MemoryControlBlock *next;
-    MemoryControlBlock *previous;
 
     string ToString() {
         // print something from v to str, e.g: Str << v.getX();
@@ -72,12 +68,10 @@ public:
         MemoryControlBlock block;
         auto result = currentAddr;
         if (memoryBlocks.empty()) {
-            block = MemoryControlBlock(num_bytes, result, nullptr, nullptr);
+            block = MemoryControlBlock(num_bytes, result);
         } else {
-            ulong last = memoryBlocks.size() - 1;
-            MemoryControlBlock lastBlock = memoryBlocks[last];
-            block = MemoryControlBlock(num_bytes, result, &lastBlock, nullptr);
-            lastBlock.next = &block;
+
+            block = MemoryControlBlock(num_bytes, result);
         }
 
         currentAddr += num_bytes;
@@ -88,36 +82,44 @@ public:
 
     void free(void *ptr) {
         int idx = -1;
-        MemoryControlBlock blockToFree;
         for (int i = 0; i < memoryBlocks.size(); ++i) {
-            auto block = memoryBlocks[i];
-            if (block.GetPointer() == ptr) {
+
+            if (memoryBlocks[i].GetPointer() == ptr) {
                 idx = i;
-                blockToFree = block;
+                sizeTaken -= memoryBlocks[i].GetSize();
+                memoryBlocks[i].isFree = true;
                 break;
             }
         }
         if (idx == -1)
             throw exception();
-        memoryBlocks.erase(memoryBlocks.begin() + idx);
-        sizeTaken -= blockToFree.GetSize();
-        blockToFree.isFree = true;
+        // memoryBlocks.erase(memoryBlocks.begin() + idx);
+        //  memoryBlocks.insert(memoryBlocks.begin() + idx,);
 
-        MemoryControlBlock *nextBlock = blockToFree.next;
-        MemoryControlBlock *prevBlock = blockToFree.previous;
-        if (prevBlock != NULL) {
-            prevBlock->next = nextBlock;
-        }
-        if (nextBlock != NULL) {
-            nextBlock->previous = prevBlock;
-        }
+        auto a = 0;
     }
 
     void Dump() {
         cout << "NEW DUMP:" << endl;
-        cout << "Capacity: " + to_string(maxSize) << endl;
-        cout << "Size taken: " + to_string(sizeTaken) << endl;
-        cout << "Blocks in use: " + to_string(memoryBlocks.size()) << endl;
+        string outer_result;
+        for (int i = 0; i < memoryBlocks.size(); ++i) {
+            string insideResult = "|";
+            string sep;
+            if (memoryBlocks[i].isFree)
+                sep = "_";
+            else sep = "#";
+            int upper = memoryBlocks[i].size / 2;
+            for (int j = 0; j < upper; ++j) {
+                insideResult += sep;
+            }
+            insideResult += "|";
+            outer_result += insideResult;
+        }
+        cout << outer_result << endl;
+//        cout << "NEW DUMP:" << endl;
+//        cout << "Capacity: " + to_string(maxSize) << endl;
+//        cout << "Size taken: " + to_string(sizeTaken) << endl;
+//        cout << "Blocks in use: " + to_string(memoryBlocks.size()) << endl;
 //        for (int i = 0; i < memoryBlocks.size(); ++i) {
 //            cout << "BLOCK" + to_string(i) + ":\n" + memoryBlocks[i].ToString() << endl;
 //        }
