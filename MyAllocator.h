@@ -40,7 +40,7 @@ public:
     void *alloc(int num_bytes) {
         if (memoryBlocks.empty() || freeBlocksIndexes.empty())
             return insertNewBlock(num_bytes);
-
+        //TODO: объединять больше, чем 2 блока, сделать побыстрее
         sort(freeBlocksIndexes.begin(), freeBlocksIndexes.end());
         for (int i = 0; i < freeBlocksIndexes.size(); ++i) {
             int freeBlockIndex = freeBlocksIndexes[i];
@@ -106,6 +106,11 @@ public:
             outer_result += insideResult;
         }
         cout << outer_result << endl;
+        string free;
+        for (int i = 0; i < freeBlocksIndexes.size(); ++i) {
+            free += to_string(freeBlocksIndexes[i]) + " ";
+        }
+        cout << free << endl;
     }
 
 private:
