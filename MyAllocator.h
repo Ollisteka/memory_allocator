@@ -53,8 +53,7 @@ public:
             if (freeBlock->size < num_bytes && !canMergeWithNextBlockToGetEnoughSpace(freeBlock, num_bytes))
                 continue;
             void *result = freeBlock->memoryPointer;
-            if (canMergeWithNextBlockToGetEnoughSpace(freeBlock, num_bytes))
-                mergeTwoAdjacentBlocks(freeBlock);
+
             if (isNextBlockFree(freeBlock)) {
                 addThisRemainderToNextBlock(freeBlock, freeBlock->size - num_bytes, result + num_bytes);
             }
@@ -65,18 +64,14 @@ public:
                                                                  true);
                 memory[newBlock.memoryPointer] = newBlock;
                 freeMemory[newBlock.memoryPointer] = newBlock;
-                void *ptr = freeBlock->memoryPointer;
-                // auto it = freeMemory.find(ptr);
-                freeMemory.erase(ptr);
             }
-
+            sizeTaken += num_bytes;
             freeBlock->size = num_bytes;
             freeBlock->isFree = false;
+            freeMemory.erase(freeBlock->memoryPointer);
             return result;
         }
         return insertNewBlock(num_bytes);
-
-
     }
 
     void free(void *ptr) {
@@ -84,6 +79,7 @@ public:
         sizeTaken -= blockToFree->size;
         blockToFree->isFree = true;
         freeMemory[ptr] = memory[ptr];
+        defragment(ptr);
     }
 
     void Dump() {
@@ -125,9 +121,17 @@ private:
         return result;
     }
 
+    void defragment(void *startPtr) {
+        MemoryControlBlock *currentFreeBlock = &freeMemory[startPtr];
+        while (isNextBlockFree(currentFreeBlock)) {
+            mergeTwoAdjacentBlocks(currentFreeBlock);
+        }
+    }
+
     bool isNextBlockFree(MemoryControlBlock *currentFreeBlock) {
         return freeMemory.count(currentFreeBlock->memoryPointer + currentFreeBlock->size) != 0;
     }
+
 
     bool canMergeWithNextBlockToGetEnoughSpace(MemoryControlBlock *currentFreeBlock, int size_needed) {
         if (!isNextBlockFree(currentFreeBlock))
@@ -142,11 +146,11 @@ private:
         return currentBlock->memoryPointer + currentBlock->size;
     }
 
-
     void mergeTwoAdjacentBlocks(MemoryControlBlock *currentFreeBlock) {
         void *nextBlockPtr = getNextPointer(currentFreeBlock);
         MemoryControlBlock *nextFreeBlock = &memory[nextBlockPtr];
-        currentFreeBlock->size += nextFreeBlock->size;
+        freeMemory[currentFreeBlock->memoryPointer].size += nextFreeBlock->size;
+        memory[currentFreeBlock->memoryPointer].size += nextFreeBlock->size;
         freeMemory.erase(nextBlockPtr);
         memory.erase(nextBlockPtr);
     }
@@ -157,8 +161,9 @@ private:
         nextFreeBlock.memoryPointer = newPtr;
         nextFreeBlock.size += size_to_add;
         freeMemory.erase(nextBlockPtr);
+        memory.erase(nextBlockPtr);
         freeMemory[newPtr] = nextFreeBlock;
-
+        memory[newPtr] = nextFreeBlock;
     }
 
 };

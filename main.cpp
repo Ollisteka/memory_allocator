@@ -36,11 +36,15 @@ int main() {
         alloc.Dump();
     }
 
-    auto last = pointers[1];
+    auto last = pointers[2];
     alloc.free(last);
     alloc.Dump();
 
-    last = pointers[2];
+    last = pointers[3];
+    alloc.free(last);
+    alloc.Dump();
+
+    last = pointers[1];
     alloc.free(last);
     alloc.Dump();
 
@@ -62,10 +66,10 @@ int main() {
 
     pointers.push_back(alloc.alloc(sizeof(littleTest)));
     alloc.Dump();
-    pointers.push_back(alloc.alloc(sizeof(test)));
+    pointers.push_back(alloc.alloc(sizeof(veryBigTest)));
     alloc.Dump();
-    pointers.push_back(alloc.alloc(sizeof(test)));
-    alloc.Dump();
+//    pointers.push_back(alloc.alloc(sizeof(test)));
+//    alloc.Dump();
 
     // ошибка
     /*
