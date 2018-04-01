@@ -44,16 +44,19 @@ int main() {
     alloc.free(last);
     alloc.Dump();
 
-    last = pointers[1];
-    alloc.free(last);
+    pointers.push_back(alloc.alloc(sizeof(middleTest)));
     alloc.Dump();
+
+//    last = pointers[1];
+//    alloc.free(last);
+//    alloc.Dump();
 
     last = pointers[4];
     alloc.free(last);
     alloc.Dump();
 
-    pointers.push_back(alloc.alloc(sizeof(veryBigTest)));
-    alloc.Dump();
+//    pointers.push_back(alloc.alloc(sizeof(veryBigTest)));
+//    alloc.Dump();
 /*
     //вставить большой кусок, объединив два
     pointers.push_back(alloc.alloc(sizeof(middleTest)));
@@ -66,8 +69,8 @@ int main() {
 
     pointers.push_back(alloc.alloc(sizeof(littleTest)));
     alloc.Dump();
-    pointers.push_back(alloc.alloc(sizeof(veryBigTest)));
-    alloc.Dump();
+//    pointers.push_back(alloc.alloc(sizeof(veryBigTest)));
+//    alloc.Dump();
 //    pointers.push_back(alloc.alloc(sizeof(test)));
 //    alloc.Dump();
 

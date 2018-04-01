@@ -12,11 +12,10 @@
 
 using namespace std;
 
-class MemoryControlBlock {
-public:
-    MemoryControlBlock() {
+struct MemoryControlBlock {
 
-    }
+    MemoryControlBlock() = default;
+
     MemoryControlBlock(int size, void *ptr, bool free = false) {
         this->size = size;
         this->memoryPointer = ptr;
@@ -53,7 +52,8 @@ public:
             if (freeBlock->size < num_bytes && !canMergeWithNextBlockToGetEnoughSpace(freeBlock, num_bytes))
                 continue;
             void *result = freeBlock->memoryPointer;
-
+            if (canMergeWithNextBlockToGetEnoughSpace(freeBlock, num_bytes))
+                mergeTwoAdjacentBlocks(freeBlock);
             if (isNextBlockFree(freeBlock)) {
                 addThisRemainderToNextBlock(freeBlock, freeBlock->size - num_bytes, result + num_bytes);
             }
@@ -86,9 +86,9 @@ public:
         cout << "Taken " + to_string(sizeTaken) + " out of " + to_string(maxSize) << endl;
         string outer_result;
         vector<void *> sortedMemory;
-        for (pair<void *, MemoryControlBlock> memoryBlock : memory) {
+        for (pair<void *, MemoryControlBlock> memoryBlock : memory)
             sortedMemory.push_back(memoryBlock.first);
-        }
+
         sort(sortedMemory.begin(), sortedMemory.end());
         for (auto ptr : sortedMemory) {
             string insideResult = "|";
