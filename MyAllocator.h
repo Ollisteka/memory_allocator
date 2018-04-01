@@ -4,6 +4,8 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
+#include <unordered_map>
+#include <map>
 
 #ifndef MALLOC_MY_ALLOCATOR_H
 #define MALLOC_MY_ALLOCATOR_H
@@ -12,6 +14,9 @@ using namespace std;
 
 class MemoryControlBlock {
 public:
+    MemoryControlBlock() {
+
+    }
     MemoryControlBlock(int size, void *ptr, bool free = false) {
         this->size = size;
         this->memoryPointer = ptr;
@@ -29,8 +34,10 @@ private:
     int sizeTaken = 0;
     void *firstAddress;
     void *currentAddress;
-    vector<MemoryControlBlock> memoryBlocks;
-    vector<int> freeBlocksIndexes;
+    unordered_map<void *, MemoryControlBlock> memory;
+    unordered_map<void *, MemoryControlBlock> freeMemory;
+    //vector<MemoryControlBlock> memoryBlocks;
+    //vector<int> freeBlocksIndexes;
 public:
     MyAllocator() {
         firstAddress = malloc(static_cast<size_t>(maxSize));
@@ -38,34 +45,29 @@ public:
     }
 
     void *alloc(int num_bytes) {
-        if (memoryBlocks.empty() || freeBlocksIndexes.empty())
+        if (memory.empty() || freeMemory.empty())
             return insertNewBlock(num_bytes);
         //TODO: объединять больше, чем 2 блока, сделать побыстрее
-        sort(freeBlocksIndexes.begin(), freeBlocksIndexes.end());
-        for (int i = 0; i < freeBlocksIndexes.size(); ++i) {
-            int freeBlockIndex = freeBlocksIndexes[i];
-            MemoryControlBlock *freeBlock = &memoryBlocks[freeBlockIndex];
-            if (freeBlock->size < num_bytes && !canMergeWithNextBlockToGetEnoughSpace(i, freeBlockIndex, num_bytes))
+        for (pair<void *, MemoryControlBlock> element : freeMemory) {
+            MemoryControlBlock *freeBlock = &memory[element.first];
+            if (freeBlock->size < num_bytes && !canMergeWithNextBlockToGetEnoughSpace(freeBlock, num_bytes))
                 continue;
-
             void *result = freeBlock->memoryPointer;
-            if (canMergeWithNextBlockToGetEnoughSpace(i, freeBlockIndex, num_bytes))
-                mergeTwoAdjacentBlocks(freeBlock, freeBlockIndex, i);
-            if (isNextBlockFree(freeBlockIndex, i)) {
-                addThisRemainderToNextBlock(i, freeBlockIndex, freeBlock->size - num_bytes, result + num_bytes);
+            if (canMergeWithNextBlockToGetEnoughSpace(freeBlock, num_bytes))
+                mergeTwoAdjacentBlocks(freeBlock);
+            if (isNextBlockFree(freeBlock)) {
+                addThisRemainderToNextBlock(freeBlock, freeBlock->size - num_bytes, result + num_bytes);
             }
                 //дроблю текущий
             else if (freeBlock->size > num_bytes) {
                 MemoryControlBlock newBlock = MemoryControlBlock(freeBlock->size - num_bytes,
                                                                  freeBlock->memoryPointer + num_bytes,
                                                                  true);
-                memoryBlocks.insert(memoryBlocks.begin() + freeBlockIndex + 1, newBlock);
-                freeBlocksIndexes.erase(freeBlocksIndexes.begin() + i);
-                freeBlocksIndexes.insert(freeBlocksIndexes.begin() + i, freeBlockIndex + 1);
-                for (int j = i + 1; j < freeBlocksIndexes.size(); ++j) {
-                    freeBlocksIndexes[j]++;
-                }
-
+                memory[newBlock.memoryPointer] = newBlock;
+                freeMemory[newBlock.memoryPointer] = newBlock;
+                void *ptr = freeBlock->memoryPointer;
+                // auto it = freeMemory.find(ptr);
+                freeMemory.erase(ptr);
             }
 
             freeBlock->size = num_bytes;
@@ -78,27 +80,24 @@ public:
     }
 
     void free(void *ptr) {
-        int idx = -1;
-        for (int i = 0; i < memoryBlocks.size(); ++i) {
-            if (memoryBlocks[i].memoryPointer == ptr) {
-                idx = i;
-                sizeTaken -= memoryBlocks[i].size;
-                memoryBlocks[i].isFree = true;
-                freeBlocksIndexes.push_back(i);
-                break;
-            }
-        }
-        if (idx == -1)
-            throw exception();
+        MemoryControlBlock *blockToFree = &memory[ptr];
+        sizeTaken -= blockToFree->size;
+        blockToFree->isFree = true;
+        freeMemory[ptr] = memory[ptr];
     }
 
     void Dump() {
         cout << "Taken " + to_string(sizeTaken) + " out of " + to_string(maxSize) << endl;
         string outer_result;
-        for (auto &memoryBlock : memoryBlocks) {
+        vector<void *> sortedMemory;
+        for (pair<void *, MemoryControlBlock> memoryBlock : memory) {
+            sortedMemory.push_back(memoryBlock.first);
+        }
+        sort(sortedMemory.begin(), sortedMemory.end());
+        for (auto ptr : sortedMemory) {
             string insideResult = "|";
-            string sep = memoryBlock.isFree ? "_" : "#";
-            int upper = memoryBlock.size / 2;
+            string sep = memory[ptr].isFree ? "_" : "#";
+            int upper = memory[ptr].size / 2;
             for (int j = 0; j < upper; ++j) {
                 insideResult += sep;
             }
@@ -106,11 +105,11 @@ public:
             outer_result += insideResult;
         }
         cout << outer_result << endl;
-        string free;
-        for (int i = 0; i < freeBlocksIndexes.size(); ++i) {
-            free += to_string(freeBlocksIndexes[i]) + " ";
-        }
-        cout << free << endl;
+//        string free;
+//        for (pair<void*, MemoryControlBlock> memoryBlock : freeMemory) {
+//            free += to_string(memoryBlock.first) + " ";
+//        }
+//        cout << free << endl;
     }
 
 private:
@@ -119,42 +118,46 @@ private:
             cout << "Out of memory!" << endl;
             throw bad_alloc();
         }
-        auto result = currentAddress;
-        MemoryControlBlock block = MemoryControlBlock(num_bytes, result);
+        void *result = currentAddress;
+        memory[result] = MemoryControlBlock(num_bytes, result);
         currentAddress += num_bytes;
         sizeTaken += num_bytes;
-        memoryBlocks.push_back(block);
         return result;
     }
 
-    bool isNextBlockFree(int currentFreeBlockIndex, int i) {
-        return i + 1 < freeBlocksIndexes.size() && currentFreeBlockIndex + 1 == freeBlocksIndexes[i + 1];
+    bool isNextBlockFree(MemoryControlBlock *currentFreeBlock) {
+        return freeMemory.count(currentFreeBlock->memoryPointer + currentFreeBlock->size) != 0;
     }
 
-    bool canMergeWithNextBlockToGetEnoughSpace(int i, int currentFreeBlockIndex, int size_needed) {
-        if (!isNextBlockFree(currentFreeBlockIndex, i))
+    bool canMergeWithNextBlockToGetEnoughSpace(MemoryControlBlock *currentFreeBlock, int size_needed) {
+        if (!isNextBlockFree(currentFreeBlock))
             return false;
-        int currentSize = memoryBlocks[currentFreeBlockIndex].size;
-        int nextSize = memoryBlocks[currentFreeBlockIndex + 1].size;
+        int currentSize = currentFreeBlock->size;
+        int nextSize = memory[getNextPointer(currentFreeBlock)].size;
         return currentSize + nextSize >= size_needed;
 
     }
 
-    void mergeTwoAdjacentBlocks(MemoryControlBlock *currentFreeBlock, int freeBlockIndex, int i) {
-        MemoryControlBlock *nextFreeBlock = &memoryBlocks[freeBlockIndex + 1];
-        currentFreeBlock->size += nextFreeBlock->size;
-        freeBlocksIndexes.erase(freeBlocksIndexes.begin() + i + 1);
-        for (int j = i + 1; j < freeBlocksIndexes.size(); ++j) {
-            freeBlocksIndexes[j]--;
-        }
-        memoryBlocks.erase(memoryBlocks.begin() + freeBlockIndex + 1);
+    void *getNextPointer(MemoryControlBlock *currentBlock) {
+        return currentBlock->memoryPointer + currentBlock->size;
     }
 
-    void addThisRemainderToNextBlock(int i, int freeBlockIndex, int size_to_add, void *ptr) {
-        MemoryControlBlock *nextFreeBlock = &memoryBlocks[freeBlockIndex + 1];
-        nextFreeBlock->memoryPointer = ptr;
-        nextFreeBlock->size += size_to_add;
-        freeBlocksIndexes.erase(freeBlocksIndexes.begin() + i);
+
+    void mergeTwoAdjacentBlocks(MemoryControlBlock *currentFreeBlock) {
+        void *nextBlockPtr = getNextPointer(currentFreeBlock);
+        MemoryControlBlock *nextFreeBlock = &memory[nextBlockPtr];
+        currentFreeBlock->size += nextFreeBlock->size;
+        freeMemory.erase(nextBlockPtr);
+        memory.erase(nextBlockPtr);
+    }
+
+    void addThisRemainderToNextBlock(MemoryControlBlock *currentFreeBlock, int size_to_add, void *newPtr) {
+        void *nextBlockPtr = getNextPointer(currentFreeBlock);
+        MemoryControlBlock nextFreeBlock = memory[nextBlockPtr];
+        nextFreeBlock.memoryPointer = newPtr;
+        nextFreeBlock.size += size_to_add;
+        freeMemory.erase(nextBlockPtr);
+        freeMemory[newPtr] = nextFreeBlock;
 
     }
 
